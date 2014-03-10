@@ -69,8 +69,9 @@ module.exports = function(grunt) {
 
         srcStat = fs.lstatSync(src);
         isLink = srcStat.isSymbolicLink();
-        if (grunt.file.isDir(src)) {
-          grunt.verbose.writeln('Creating ' + chalk.cyan(dest));
+
+        //helper function for copying
+        var copier = function(symlinksNotImplementedCallback, specialActions){
           if (options.copySymlinkAsSymlink && isLink) {
             try {
               grunt.file.mkdir(path.dirname(dest));
@@ -78,40 +79,39 @@ module.exports = function(grunt) {
                 grunt.file.delete(dest);
               }
               fs.symlinkSync(fs.readlinkSync(src), dest);
-              copiedDirLinks.push(new RegExp('^' + src.replace(/\/*$/,'/').replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&")));
+
+              if (specialActions !== undefined) {
+                specialActions(src, dest);
+              }
             } catch(e) {
               if (e.errno === symlinksNotImplementedCode) {
-                grunt.file.mkdir(dest);
+                symlinksNotImplementedCallback(src, dest);
               }else{
                 throw e;
               }
             }
           } else {
-            grunt.file.mkdir(dest);
-          }
-          tally.dirs++;
-        } else {
-          grunt.verbose.writeln('Copying ' + chalk.cyan(src) + ' -> ' + chalk.cyan(dest));
-          if (options.copySymlinkAsSymlink && isLink) {
-            try {
-              grunt.file.mkdir(path.dirname(dest));
-              if (grunt.file.exists(dest)) {
-                grunt.file.delete(dest);
-              }
-              fs.symlinkSync(fs.readlinkSync(src), dest);
-            } catch(e) {
-              if (e.errno === symlinksNotImplementedCode) {
-                grunt.file.copy(src, dest, copyOptions);
-              }else{
-                throw e;
-              }
-            }
-          } else {
-            grunt.file.copy(src, dest, copyOptions);
+            symlinksNotImplementedCallback(src, dest);
           }
           if (options.mode !== false && !(options.copySymlinkAsSymlink && isLink)) {
             fs.chmodSync(dest, (options.mode === true) ? srcStat.mode : options.mode);
           }
+        };
+
+        //copying process
+        if (grunt.file.isDir(src)) {
+          grunt.verbose.writeln('Creating ' + chalk.cyan(dest));
+          copier(function(src, dest){
+            grunt.file.mkdir(dest);
+          }, function(src){
+            copiedDirLinks.push(new RegExp('^' + src.replace(/\/*$/,'/').replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&")));
+          });
+          tally.dirs++;
+        } else {
+          grunt.verbose.writeln('Copying ' + chalk.cyan(src) + ' -> ' + chalk.cyan(dest));
+          copier(function(src, dest){
+            grunt.file.copy(src, dest);
+          });
           tally.files++;
         }
       });
