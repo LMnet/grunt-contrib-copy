@@ -73,6 +73,10 @@ module.exports = function(grunt) {
           grunt.verbose.writeln('Creating ' + chalk.cyan(dest));
           if (options.copySymlinkAsSymlink && isLink) {
             try {
+              grunt.file.mkdir(path.dirname(dest));
+              if (grunt.file.exists(dest)) {
+                grunt.file.delete(dest);
+              }
               fs.symlinkSync(fs.readlinkSync(src), dest);
               copiedDirLinks.push(new RegExp('^' + src.replace(/\/*$/,'/').replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&")));
             } catch(e) {
